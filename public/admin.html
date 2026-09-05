@@ -1,0 +1,197 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin - NusaLapak</title><link rel="stylesheet" href="/css/style.css"></head><body><script src="/js/app.js"></script><script>
+if (!store.token) location.href = '/login.html';
+const view = new URLSearchParams(location.search).get('v') || 'dashboard';
+const LBL = { pending: 'Menunggu', diproses: 'Diproses', dikirim: 'Dikirim', selesai: 'Selesai', batal: 'Dibatalkan' };
+const menu = [['dashboard', 'Ringkasan'], ['products', 'Produk'], ['categories', 'Kategori'], ['orders', 'Pesanan'], ['users', 'Pengguna'], ['reports', 'Laporan']];
+(async () => {
+  let me;
+  try { me = (await api('/api/auth/me')).user; } catch (e) { location.href = '/login.html'; return; }
+  if (me.role !== 'admin') { document.body.innerHTML = '<div class="container" style="padding:40px"><div class="alert alert-err">Halaman ini khusus admin. <a href="/index.html">Kembali ke beranda</a>.</div></div>'; return; }
+  document.body.innerHTML = navbar('') + `<main class="container" style="padding-top:20px;min-height:60vh">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <h1 style="margin:0">Dashboard Admin</h1>
+      <span class="pill pill-sage">${esc(me.name)}</span>
+    </div>
+    <div class="admin-layout" style="margin-top:16px">
+      <aside class="card sidebar">${menu.map(([k, l]) => `<a href="/admin.html?v=${k}" class="${view === k ? 'active' : ''}">${l}</a>`).join('')}<a href="/index.html">Lihat Toko</a></aside>
+      <div id="content"><div class="card">Memuat...</div></div>
+    </div></main>` + footer();
+  renderCartBadge();
+  document.getElementById('btnLogout').onclick = () => { store.token = ''; store.user = null; location.href = '/index.html'; };
+  const el = (html) => { document.getElementById('content').innerHTML = html; };
+  try {
+    if (view === 'dashboard') await vDash(el);
+    else if (view === 'products') await vProducts(el);
+    else if (view === 'categories') await vCats(el);
+    else if (view === 'orders') await vOrders(el);
+    else if (view === 'users') await vUsers(el);
+    else if (view === 'reports') await vReports(el);
+  } catch (e) { el(alertBox(e.message)); }
+})();
+
+async function vDash(el) {
+  const s = await api('/api/admin/stats');
+  el(`<div class="stat-grid">
+      <div class="card stat"><div class="num">${s.totalProducts}</div><small>Produk aktif</small></div>
+      <div class="card stat"><div class="num">${s.totalUsers}</div><small>Pengguna</small></div>
+      <div class="card stat"><div class="num">${s.totalOrders}</div><small>Total order</small></div>
+      <div class="card stat"><div class="num">${rupiah(s.revenue)}</div><small>Revenue (non-batal)</small></div>
+    </div>
+    <div class="two-col" style="margin-top:14px;grid-template-columns:1fr 1fr">
+      <div class="card"><strong>Order terbaru</strong><table class="tbl" style="margin-top:8px"><tbody>
+        ${s.recent.map(o => `<tr><td>${esc(o.code)}<br><small style="color:var(--muted)">${esc(o.created_at)}</small></td><td style="text-align:right"><span class="status status-${o.status}">${LBL[o.status]}</span><br><strong>${rupiah(o.total)}</strong></td></tr>`).join('') || '<tr><td>Belum ada order</td></tr>'}
+      </tbody></table><p><a href="/admin.html?v=orders">Kelola semua pesanan</a></p></div>
+      <div class="card"><strong>Stok menipis (&lt;= 5)</strong><table class="tbl" style="margin-top:8px"><tbody>
+        ${s.lowStock.map(p => `<tr><td>${esc(p.name)}</td><td style="text-align:right"><strong style="color:var(--danger)">${p.stock}</strong></td></tr>`).join('') || '<tr><td>Semua stok aman</td></tr>'}
+      </tbody></table><p><a href="/admin.html?v=products">Kelola produk</a></p></div>
+    </div>`);
+}
+
+async function vProducts(el) {
+  const [{ products }, { categories }] = [await api('/api/products?limit=100'), await api('/api/categories')];
+  el(`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <strong>Daftar Produk (${products.length})</strong><button class="btn btn-terra btn-small" id="btnNew">Tambah Produk</button></div>
+    <div id="formWrap" style="margin-top:12px"></div>
+    <div style="overflow-x:auto"><table class="tbl" style="margin-top:8px"><thead><tr><th>Produk</th><th>Harga</th><th>Stok</th><th>Status</th><th></th></tr></thead><tbody>
+    ${products.map(p => `<tr><td><strong>${esc(p.name)}</strong><br><small style="color:var(--muted)">${esc(p.category ? p.category.name : '-')} - Terjual ${p.sold}</small></td>
+      <td>${rupiah(p.price)}</td><td>${p.stock}</td>
+      <td>${p.is_featured ? '<span class="pill pill-terra">Unggulan</span> ' : ''}<span class="pill">${p.is_active ? 'Aktif' : 'Nonaktif'}</span></td>
+      <td style="white-space:nowrap"><button class="btn btn-ghost btn-small" onclick="editP(${p.id})">Ubah</button> <button class="btn btn-danger btn-small" onclick="delP(${p.id})">Hapus</button></td></tr>`).join('')}
+    </tbody></table></div></div>`);
+  window._cats = categories; window._prods = products;
+  document.getElementById('btnNew').onclick = () => pForm();
+  window.editP = (pid) => pForm(products.find(x => x.id === pid));
+  window.delP = async (pid) => {
+    if (!confirm('Nonaktifkan produk ini?')) return;
+    await api('/api/products/' + pid, { method: 'DELETE' }); location.reload();
+  };
+}
+function pForm(p) {
+  const cats = window._cats || [];
+  document.getElementById('formWrap').innerHTML = `<div class="card" style="background:var(--bg)">
+    <strong>${p ? 'Ubah Produk #' + p.id : 'Produk Baru'}</strong><div id="pfMsg"></div>
+    <label class="lbl">Nama produk</label><input class="input" id="pfName" value="${esc(p?.name || '')}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label class="lbl">Harga (Rp)</label><input class="input" id="pfPrice" type="number" min="0" value="${p?.price ?? ''}"></div>
+      <div><label class="lbl">Stok</label><input class="input" id="pfStock" type="number" min="0" value="${p?.stock ?? ''}"></div>
+    </div>
+    <label class="lbl">Kategori</label><select class="input" id="pfCat"><option value="">Tanpa kategori</option>${cats.map(c => `<option value="${c.id}" ${p?.category_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+    <label class="lbl">Deskripsi</label><textarea class="input" id="pfDesc" rows="3">${esc(p?.description || '')}</textarea>
+    <label class="lbl">Gambar (jpg/png, max 2MB)</label><input class="input" id="pfImg" type="file" accept="image/*">
+    <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
+      <label><input type="checkbox" id="pfFeat" ${p?.is_featured ? 'checked' : ''}> Unggulan</label>
+      ${p ? '<label><input type="checkbox" id="pfAct" ' + (p.is_active ? 'checked' : '') + '> Aktif</label>' : ''}
+      <button class="btn btn-terra btn-small" id="pfSave">Simpan</button>
+    </div></div>`;
+  document.getElementById('pfSave').onclick = async () => {
+    const fd = new FormData();
+    fd.append('name', document.getElementById('pfName').value);
+    fd.append('price', document.getElementById('pfPrice').value);
+    fd.append('stock', document.getElementById('pfStock').value);
+    fd.append('category_id', document.getElementById('pfCat').value);
+    fd.append('description', document.getElementById('pfDesc').value);
+    fd.append('is_featured', document.getElementById('pfFeat').checked ? '1' : '');
+    if (p && document.getElementById('pfAct')) fd.append('is_active', document.getElementById('pfAct').checked ? '1' : '0');
+    const f = document.getElementById('pfImg').files[0];
+    if (f) fd.append('image', f);
+    try {
+      const res = await fetch('/api/products' + (p ? '/' + p.id : ''), { method: p ? 'PUT' : 'POST', headers: { Authorization: 'Bearer ' + store.token }, body: fd });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Gagal menyimpan');
+      location.reload();
+    } catch (e) { document.getElementById('pfMsg').innerHTML = alertBox(e.message); }
+  };
+}
+
+async function vCats(el) {
+  const { categories } = await api('/api/categories');
+  el(`<div class="card"><strong>Kategori (${categories.length})</strong><div id="cfMsg" style="margin-top:8px"></div>
+    <div class="toolbar" style="margin-top:10px"><input class="input" id="cfName" placeholder="Nama kategori baru"><input class="input" id="cfDesc" placeholder="Deskripsi singkat"><button class="btn btn-terra btn-small" id="cfAdd">Tambah</button></div>
+    <table class="tbl"><thead><tr><th>Nama</th><th>Slug</th><th>Produk</th><th></th></tr></thead><tbody>
+    ${categories.map(c => `<tr><td><strong>${esc(c.name)}</strong><br><small style="color:var(--muted)">${esc(c.description || '')}</small></td><td>${esc(c.slug)}</td><td>${c.product_count}</td>
+      <td style="white-space:nowrap"><button class="btn btn-ghost btn-small" onclick="renC(${c.id},'${esc(c.name)}')">Ubah</button> <button class="btn btn-danger btn-small" onclick="delC(${c.id})">Hapus</button></td></tr>`).join('')}
+    </tbody></table></div>`);
+  document.getElementById('cfAdd').onclick = async () => {
+    try {
+      await api('/api/categories', { method: 'POST', body: { name: document.getElementById('cfName').value, description: document.getElementById('cfDesc').value } });
+      location.reload();
+    } catch (e) { document.getElementById('cfMsg').innerHTML = alertBox(e.message); }
+  };
+  window.renC = async (cid, old) => {
+    const name = prompt('Nama baru kategori:', old);
+    if (!name) return;
+    await api('/api/categories/' + cid, { method: 'PUT', body: { name } }); location.reload();
+  };
+  window.delC = async (cid) => {
+    if (!confirm('Hapus kategori ini? Produk di dalamnya jadi tanpa kategori.')) return;
+    await api('/api/categories/' + cid, { method: 'DELETE' }); location.reload();
+  };
+}
+
+async function vOrders(el) {
+  const f = new URLSearchParams(location.search).get('status') || '';
+  const { orders } = await api('/api/admin/orders' + (f ? '?status=' + f : ''));
+  el(`<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <strong>Pesanan (${orders.length})</strong>
+      ${['', 'pending', 'diproses', 'dikirim', 'selesai', 'batal'].map(s => `<a class="btn ${f === s ? '' : 'btn-ghost'} btn-small" href="/admin.html?v=orders${s ? '&status=' + s : ''}">${s || 'Semua'}</a>`).join('')}
+    </div><div id="oMsg" style="margin-top:8px"></div>
+    ${orders.map(o => `<div class="card" style="margin-top:12px;background:var(--bg);box-shadow:none">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><strong>${esc(o.code)}</strong><span class="status status-${o.status}">${LBL[o.status]}</span></div>
+      <small style="color:var(--muted)">${esc(o.created_at)} - ${esc(o.recipient_name)}, ${esc(o.address)} (${esc(o.city)}) - ${esc(o.phone)} - ${esc(o.payment_method).toUpperCase()}</small>
+      <table class="tbl" style="margin-top:6px"><tbody>${o.items.map(i => `<tr><td>${esc(i.product_name)} x ${i.qty}</td><td style="text-align:right">${rupiah(i.subtotal)}</td></tr>`).join('')}</tbody></table>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${['pending', 'diproses', 'dikirim', 'selesai', 'batal'].map(s => `<button class="btn ${o.status === s ? '' : 'btn-ghost'} btn-small" onclick="setSt(${o.id},'${s}')" ${o.status === s ? 'disabled' : ''}>${LBL[s]}</button>`).join('')}</div>
+        <strong>${rupiah(o.total)}</strong>
+      </div></div>`).join('') || '<p>Belum ada pesanan pada filter ini.</p>'}
+    </div>`);
+  window.setSt = async (oid, st) => {
+    if (st === 'batal' && !confirm('Batalkan order? Stok akan dikembalikan.')) return;
+    try { await api('/api/admin/orders/' + oid + '/status', { method: 'PUT', body: { status: st } }); location.reload(); }
+    catch (e) { document.getElementById('oMsg').innerHTML = alertBox(e.message); }
+  };
+}
+
+async function vUsers(el) {
+  const { users } = await api('/api/admin/users');
+  el(`<div class="card"><strong>Pengguna (${users.length})</strong><div id="uMsg" style="margin-top:8px"></div>
+    <div style="overflow-x:auto"><table class="tbl" style="margin-top:8px"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
+    ${users.map(u => `<tr><td><strong>${esc(u.name)}</strong><br><small style="color:var(--muted)">${esc(u.city || '-')} - ${esc(u.created_at)}</small></td><td>${esc(u.email)}</td><td>${esc(u.role)}</td>
+      <td>${u.is_active ? '<span class="pill pill-sage">Aktif</span>' : '<span class="pill">Nonaktif</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-small" onclick="togU(${u.id},${u.is_active ? 0 : 1})">${u.is_active ? 'Nonaktifkan' : 'Aktifkan'}</button>
+        <button class="btn btn-ghost btn-small" onclick="roleU(${u.id},'${u.role === 'admin' ? 'user' : 'admin'}')">Jadikan ${u.role === 'admin' ? 'user' : 'admin'}</button>
+      </td></tr>`).join('')}
+    </tbody></table></div></div>`);
+  window.togU = async (uid, v) => { await api('/api/admin/users/' + uid, { method: 'PUT', body: { is_active: !!v } }); location.reload(); };
+  window.roleU = async (uid, r) => { if (!confirm('Ubah role ke ' + r + '?')) return; await api('/api/admin/users/' + uid, { method: 'PUT', body: { role: r } }); location.reload(); };
+}
+
+async function vReports(el) {
+  const r = await api('/api/admin/reports/sales');
+  el(`<div class="card"><strong>Laporan Penjualan</strong>
+      <p style="color:var(--muted)">Revenue dihitung dari order non-batal. 14 hari terakhir + per kategori + produk terlaris.</p></div>
+    <div class="card" style="margin-top:12px"><strong>Revenue harian</strong><canvas id="chDaily" width="800" height="260" style="width:100%;height:auto"></canvas></div>
+    <div class="two-col" style="margin-top:12px;grid-template-columns:1fr 1fr">
+      <div class="card"><strong>Per kategori</strong><table class="tbl" style="margin-top:8px"><tbody>
+        ${r.byCat.map(c => `<tr><td>${esc(c.category)}</td><td>${c.qty} pcs</td><td style="text-align:right"><strong>${rupiah(c.revenue)}</strong></td></tr>`).join('') || '<tr><td>Belum ada penjualan</td></tr>'}
+      </tbody></table></div>
+      <div class="card"><strong>Produk terlaris</strong><table class="tbl" style="margin-top:8px"><tbody>
+        ${r.top.map(t => `<tr><td>${esc(t.product_name)}</td><td>${t.qty} pcs</td><td style="text-align:right"><strong>${rupiah(t.revenue)}</strong></td></tr>`).join('') || '<tr><td>Belum ada penjualan</td></tr>'}
+      </tbody></table></div>
+    </div>`);
+  const cv = document.getElementById('chDaily'), ctx = cv.getContext('2d');
+  const data = r.daily, max = Math.max(1, ...data.map(d => d.revenue));
+  ctx.clearRect(0, 0, 800, 260);
+  ctx.fillStyle = '#6E7A89'; ctx.font = '11px Arial';
+  data.forEach((d, i) => {
+    const x = 40 + i * ((720) / Math.max(1, data.length));
+    const h = (d.revenue / max) * 170;
+    ctx.fillStyle = '#1E3A5F';
+    ctx.fillRect(x, 210 - h, 34, h);
+    ctx.fillStyle = '#6E7A89';
+    ctx.save(); ctx.translate(x + 4, 252); ctx.rotate(-0.5); ctx.fillText(d.day.slice(5), 0, 0); ctx.restore();
+  });
+  ctx.fillStyle = '#22303F'; ctx.font = 'bold 12px Arial';
+  ctx.fillText('Max: ' + rupiah(max), 40, 20);
+}
+</script></body></html>

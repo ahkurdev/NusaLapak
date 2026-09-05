@@ -1,0 +1,74 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Belanja - NusaLapak</title><link rel="stylesheet" href="/css/style.css"></head><body><script src="/js/app.js"></script><script>
+const qs = new URLSearchParams(location.search);
+const state = { q: qs.get('q') || '', category: qs.get('category') || '', sort: 'newest', min_price: '', max_price: '', page: 1 };
+(async () => {
+  const { categories } = await api('/api/categories');
+  render(categories, [], 1, 1, '');
+  await load(categories);
+})();
+async function load(categories) {
+  const p = new URLSearchParams({ limit: 12, page: state.page, sort: state.sort });
+  if (state.q) p.set('q', state.q);
+  if (state.category) p.set('category', state.category);
+  if (state.min_price) p.set('min_price', state.min_price);
+  if (state.max_price) p.set('max_price', state.max_price);
+  try {
+    const d = await api('/api/products?' + p.toString());
+    render(categories || [], d.products, d.page, d.pages, '', d.total);
+  } catch (e) { render(categories || [], [], 1, 1, e.message); }
+}
+function render(categories, products, page, pages, err, total = 0) {
+  mount('products', `
+    <h1 style="margin-bottom:4px">Jelajah Produk</h1>
+    <p style="color:var(--muted);margin-top:0">${total} produk ditemukan</p>
+    ${alertBox(err)}
+    <div class="two-col">
+      <aside class="card">
+        <strong>Filter</strong>
+        <label class="lbl">Kategori</label>
+        <select class="input" id="fCat">
+          <option value="">Semua kategori</option>
+          ${categories.map(c => `<option value="${c.slug}" ${state.category === c.slug ? 'selected' : ''}>${esc(c.name)} (${c.product_count})</option>`).join('')}
+        </select>
+        <label class="lbl">Harga min (Rp)</label><input class="input" id="fMin" type="number" min="0" value="${esc(state.min_price)}" placeholder="0">
+        <label class="lbl">Harga max (Rp)</label><input class="input" id="fMax" type="number" min="0" value="${esc(state.max_price)}" placeholder="500000">
+        <label class="lbl">Urutkan</label>
+        <select class="input" id="fSort">
+          <option value="newest" ${state.sort === 'newest' ? 'selected' : ''}>Terbaru</option>
+          <option value="popular" ${state.sort === 'popular' ? 'selected' : ''}>Terlaris</option>
+          <option value="price_asc" ${state.sort === 'price_asc' ? 'selected' : ''}>Harga terendah</option>
+          <option value="price_desc" ${state.sort === 'price_desc' ? 'selected' : ''}>Harga tertinggi</option>
+        </select>
+        <button class="btn" style="width:100%;margin-top:14px" id="fApply">Terapkan</button>
+      </aside>
+      <div>
+        <div class="toolbar">
+          <input class="input" id="fQ" placeholder="Cari rendang, batik, kopi..." value="${esc(state.q)}">
+          <button class="btn btn-terra" id="fSearch">Cari</button>
+        </div>
+        <div class="grid grid-products">
+          ${products.map(p => `<div class="card product-card">
+            <a href="/product.html?id=${p.id}"><img src="${esc(p.image_url || '/img/p-' + p.id + '.svg')}" alt="${esc(p.name)}" loading="lazy"></a>
+            <div class="product-body">
+              <span class="product-cat">${esc(p.category ? p.category.name : 'Umum')}</span>
+              <a class="product-name" href="/product.html?id=${p.id}">${esc(p.name)}</a>
+              <span class="product-price">${rupiah(p.price)}</span>
+              <span class="product-meta">Rating ${p.rating || '-'} (${p.review_count}) - Stok ${p.stock}</span>
+              <button class="btn btn-terra btn-small" onclick="addToCart(${p.id},1);this.textContent='Ditambahkan';setTimeout(()=>this.textContent='Tambah',900)">Tambah</button>
+            </div></div>`).join('') || '<p style="color:var(--muted)">Tidak ada produk yang cocok dengan filter.</p>'}
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;align-items:center">
+          <button class="btn btn-ghost btn-small" id="prevPg" ${page <= 1 ? 'disabled' : ''}>Sebelumnya</button>
+          <span>Halaman ${page} / ${pages}</span>
+          <button class="btn btn-ghost btn-small" id="nextPg" ${page >= pages ? 'disabled' : ''}>Berikutnya</button>
+        </div>
+      </div>
+    </div>`);
+  const g = (id) => document.getElementById(id);
+  g('fApply').onclick = () => { state.category = g('fCat').value; state.min_price = g('fMin').value; state.max_price = g('fMax').value; state.sort = g('fSort').value; state.page = 1; load(categories); };
+  g('fSearch').onclick = () => { state.q = g('fQ').value; state.page = 1; load(categories); };
+  g('fQ').onkeydown = (e) => { if (e.key === 'Enter') { state.q = g('fQ').value; state.page = 1; load(categories); } };
+  g('prevPg').onclick = () => { state.page--; load(categories); };
+  g('nextPg').onclick = () => { state.page++; load(categories); };
+}
+</script></body></html>

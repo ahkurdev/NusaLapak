@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Keranjang - NusaLapak</title><link rel="stylesheet" href="/css/style.css"></head><body><script src="/js/app.js"></script><script>
+(async () => {
+  const cart = getCart();
+  if (!cart.length) { mount('products', `<h1>Keranjang</h1><div class="card">Keranjang masih kosong. <a href="/products.html">Yuk belanja dulu</a>.</div>`); return; }
+  let lines = [], total = 0, err = '';
+  try {
+    for (const it of cart) {
+      const { product } = await api('/api/products/' + it.product_id);
+      const sub = product.price * it.qty;
+      total += sub;
+      lines.push({ ...it, product, sub });
+    }
+  } catch (e) { err = e.message; }
+  mount('products', `<h1>Keranjang Belanja</h1>${alertBox(err)}
+    <div class="card"><table class="tbl"><thead><tr><th>Produk</th><th>Harga</th><th>Qty</th><th>Subtotal</th><th></th></tr></thead><tbody>
+    ${lines.map((l, i) => `<tr>
+      <td><a href="/product.html?id=${l.product.id}">${esc(l.product.name)}</a><br><small style="color:var(--muted)">Stok: ${l.product.stock}</small></td>
+      <td>${rupiah(l.product.price)}</td>
+      <td><div class="qty-row"><button onclick="chQty(${i},-1)">-</button><strong>${l.qty}</strong><button onclick="chQty(${i},1)">+</button></div></td>
+      <td><strong>${rupiah(l.sub)}</strong></td>
+      <td><button class="btn btn-danger btn-small" onclick="rmItem(${i})">Hapus</button></td></tr>`).join('')}
+    </tbody></table>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px">
+      <button class="btn btn-ghost" onclick="setCart([]);location.reload()">Kosongkan</button>
+      <div style="text-align:right"><div>Total: <strong style="font-size:22px;color:var(--terra-dark)">${rupiah(total)}</strong></div>
+      <a class="btn btn-terra" href="/checkout.html" style="margin-top:8px">Lanjut Checkout</a></div>
+    </div></div>`);
+})();
+function chQty(i, d) {
+  const c = getCart();
+  c[i].qty = Math.min(100, Math.max(1, c[i].qty + d));
+  setCart(c); location.reload();
+}
+function rmItem(i) { const c = getCart(); c.splice(i, 1); setCart(c); location.reload(); }
+</script></body></html>

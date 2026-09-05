@@ -1,0 +1,25 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pesanan Saya - NusaLapak</title><link rel="stylesheet" href="/css/style.css"></head><body><script src="/js/app.js"></script><script>
+if (!store.token) location.href = '/login.html';
+const FLOW = ['pending', 'diproses', 'dikirim', 'selesai'];
+const LBL = { pending: 'Menunggu', diproses: 'Diproses', dikirim: 'Dikirim', selesai: 'Selesai', batal: 'Dibatalkan' };
+(async () => {
+  const ok = new URLSearchParams(location.search).get('success');
+  try {
+    const { orders } = await api('/api/orders/my');
+    mount('orders', `<h1>Riwayat Pesanan</h1>
+      ${ok ? alertBox('Pesanan ' + ok + ' berhasil dibuat. Pantau statusnya di sini.', true) : ''}
+      ${orders.length ? orders.map(o => `
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <strong>${esc(o.code)}</strong><span class="status status-${o.status}">${LBL[o.status]}</span>
+        </div>
+        <div class="timeline">${FLOW.map(s => `<span class="${FLOW.indexOf(s) <= FLOW.indexOf(o.status) ? 'done' : ''}">${LBL[s]}</span>`).join('')}${o.status === 'batal' ? '<span style="background:#7A2A20;color:#fff">Dibatalkan</span>' : ''}</div>
+        <small style="color:var(--muted)">${esc(o.created_at)} - ${o.items.length} item - ${esc(o.payment_method).toUpperCase()} - ${esc(o.city)}</small>
+        <table class="tbl" style="margin-top:8px"><tbody>
+          ${o.items.map(i => `<tr><td>${esc(i.product_name)} x ${i.qty}</td><td style="text-align:right">${rupiah(i.subtotal)}</td></tr>`).join('')}
+        </tbody></table>
+        <div style="text-align:right;margin-top:6px">Total: <strong>${rupiah(o.total)}</strong></div>
+      </div>`).join('') : '<div class="card">Belum ada pesanan. <a href="/products.html">Mulai belanja</a>.</div>'}`);
+  } catch (e) { mount('orders', alertBox(e.message)); }
+})();
+</script></body></html>

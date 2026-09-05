@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NusaLapak - Pasar Nusantara</title><link rel="stylesheet" href="/css/style.css"></head><body><script src="/js/app.js"></script><script>
+(async () => {
+  let cats = [], feat = [];
+  try {
+    cats = (await api('/api/categories')).categories;
+    feat = (await api('/api/products?featured=1&limit=8')).products;
+  } catch (e) { mount('home', alertBox(e.message)); return; }
+  mount('home', `
+    <section class="hero">
+      <div>
+        <span class="pill" style="background:#F5EFE4;color:#1E3A5F">UMKM Nusantara - 100% Lokal</span>
+        <h1>Belanja hasil karya bangsa, dari Sabang sampai Merauke.</h1>
+        <p>Kuliner khas daerah, wastra tenun, kerajinan tangan, dan kebutuhan harian. Harga jujur langsung dari pengrajin dan petani lokal.</p>
+        <div class="hero-cta">
+          <a class="btn btn-terra" href="/products.html">Mulai Belanja</a>
+          <a class="btn" style="background:#F5EFE4;color:#1E3A5F" href="/register.html">Jadi Pembeli</a>
+        </div>
+      </div>
+      <div class="hero-panel">
+        <div class="big">${cats.reduce((a, c) => a + c.product_count, 0)}+ Produk</div>
+        <div>${cats.length} kategori kurasi UMKM</div>
+        <hr style="border:none;border-top:1px solid #D9CFBD;margin:14px 0">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="pill">Ongkir transparan</span><span class="pill pill-sage">Stok real-time</span><span class="pill pill-terra">Lacak pesanan</span>
+        </div>
+      </div>
+    </section>
+    <div class="section-title"><h2>Kategori Pilihan</h2><a href="/products.html">Lihat semua</a></div>
+    <div class="cat-row">${cats.map(c => `
+      <a class="card cat-card" href="/products.html?category=${c.slug}">
+        <div class="cat-icon">${esc(c.icon || c.name[0])}</div>
+        <strong>${esc(c.name)}</strong><br><small style="color:var(--muted)">${c.product_count} produk</small>
+      </a>`).join('')}</div>
+    <div class="section-title"><h2>Produk Unggulan</h2><a href="/products.html">Lihat semua</a></div>
+    <div class="grid grid-products">${feat.map(card).join('')}</div>
+    <div class="card" style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+      <div><strong>Pembayaran fleksibel</strong><br><small style="color:var(--muted)">Transfer bank, e-wallet, atau COD di tempat.</small></div>
+      <div><strong>Stok otomatis</strong><br><small style="color:var(--muted)">Stok berkurang saat checkout, kembali saat order dibatalkan admin.</small></div>
+      <div><strong>Ulasan pembeli</strong><br><small style="color:var(--muted)">Rating dan review asli dari pembeli terverifikasi.</small></div>
+    </div>`);
+})();
+function card(p) {
+  return `<div class="card product-card">
+    <a href="/product.html?id=${p.id}"><img src="${esc(p.image_url || '/img/p-' + p.id + '.svg')}" alt="${esc(p.name)}" loading="lazy"></a>
+    <div class="product-body">
+      <span class="product-cat">${esc(p.category ? p.category.name : 'Umum')}</span>
+      <a class="product-name" href="/product.html?id=${p.id}">${esc(p.name)}</a>
+      <span class="product-price">${rupiah(p.price)}</span>
+      <span class="product-meta">Rating ${p.rating || '-'} (${p.review_count}) - Terjual ${p.sold} - Stok ${p.stock}</span>
+      <button class="btn btn-terra btn-small" onclick="addToCart(${p.id},1);this.textContent='Ditambahkan';setTimeout(()=>this.textContent='Tambah',900)">Tambah</button>
+    </div></div>`;
+}
+</script></body></html>

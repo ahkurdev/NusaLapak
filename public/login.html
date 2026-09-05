@@ -1,0 +1,17 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Masuk - NusaLapak</title><link rel="stylesheet" href="/css/style.css"></head><body><script src="/js/app.js"></script><script>
+mount('home', `<div class="card" style="max-width:440px;margin:40px auto">
+  <h1 style="margin-top:0">Masuk</h1><div id="msg"></div>
+  <label class="lbl">Email</label><input class="input" id="lEmail" type="email" placeholder="nama@email.com">
+  <label class="lbl">Password</label><input class="input" id="lPass" type="password" placeholder="Password">
+  <button class="btn" id="btnLogin" style="width:100%;margin-top:16px">Masuk</button>
+  <p style="text-align:center">Belum punya akun? <a href="/register.html">Daftar gratis</a></p>
+  <div class="card" style="background:var(--sand);box-shadow:none"><small>Akun demo:<br>Admin: admin@nusalapak.id / admin123<br>Pembeli: demo@nusalapak.id / demo1234</small></div>
+</div>`);
+document.getElementById('btnLogin').onclick = async () => {
+  try {
+    const d = await api('/api/auth/login', { method: 'POST', body: { email: document.getElementById('lEmail').value, password: document.getElementById('lPass').value } });
+    store.token = d.token; store.user = d.user;
+    location.href = d.user.role === 'admin' ? '/admin.html' : '/index.html';
+  } catch (e) { document.getElementById('msg').innerHTML = alertBox(e.message); }
+};
+</script></body></html>
