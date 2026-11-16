@@ -1,129 +1,131 @@
-# NusaLapak — Pasar Nusantara
+# NusaLapak — Nusantara Market
 
-Marketplace full-stack bertema Nusantara: katalog produk UMKM, keranjang, checkout dengan
-stok otomatis, ulasan/rating, autentikasi JWT berbasis role, dan dashboard admin terpisah
-(CRUD produk, kategori, pengguna, pesanan, plus laporan penjualan).
+Bahasa Indonesia version: [readme.id.md](readme.id.md)
 
-Brand, logo, dan tema visual dibuat orisinal untuk proyek ini — bukan meniru platform manapun.
+A Nusantara-themed full-stack marketplace: a catalogue of MSME products, cart, checkout with
+automatic stock updates, reviews/ratings, role-based JWT authentication, and a separate admin dashboard
+(CRUD for products, categories, users, and orders, plus sales reports).
+
+The brand, logo, and visual theme were created originally for this project — they do not copy any platform.
 
 ## Tech Stack
 
-| Lapisan  | Teknologi |
+| Layer  | Technology |
 |----------|-----------|
 | Backend  | Node.js 22+, Express 4 |
-| Database | SQLite via `node:sqlite` (tanpa server DB eksternal) |
+| Database | SQLite via `node:sqlite` (no external DB server) |
 | Auth     | bcryptjs + JWT (`jsonwebtoken`) |
-| Upload   | multer (gambar produk, max 2 MB) |
-| Frontend | HTML + CSS + JS vanilla (tanpa build step, tanpa framework) |
-| Grafik laporan | Canvas 2D bawaan browser |
+| Upload   | multer (product images, max 2 MB) |
+| Frontend | HTML + CSS + vanilla JS (no build step, no framework) |
+| Report charts | Built-in browser Canvas 2D |
 
-## Fitur
+## Features
 
-### Publik / Pembeli
-- Landing page: hero, kategori pilihan, produk unggulan, keunggulan toko
-- Daftar produk: search, filter kategori, filter rentang harga, sorting
-  (terbaru / terlaris / harga terendah / tertinggi), pagination
-- Detail produk: galeri gambar, deskripsi, harga, stok real-time, rating rata-rata,
-  daftar ulasan, tulis/ubah ulasan (login)
-- Keranjang (localStorage): tambah, ubah qty, hapus, kosongkan
-- Checkout: data penerima + metode bayar (transfer / e-wallet / COD),
-  stok berkurang atomik per transaksi
-- Riwayat pesanan dengan timeline status
-- Auth: register, login, logout, edit profil (nama, HP, alamat, kota), ganti password
-- Halaman profil: data diri + ringkasan total order dan total belanja
+### Public / Buyers
+- Landing page: hero, featured categories, featured products, store highlights
+- Product list: search, category filter, price-range filter, sorting
+  (newest / best-selling / lowest / highest price), pagination
+- Product details: image gallery, description, price, real-time stock, average rating,
+  review list, write/edit a review (login required)
+- Cart (localStorage): add, change quantity, remove, empty
+- Checkout: recipient details + payment method (transfer / e-wallet / COD),
+  stock reduced atomically per transaction
+- Order history with a status timeline
+- Auth: register, login, logout, edit profile (name, phone, address, city), change password
+- Profile page: personal details + a summary of total orders and total spend
 
-### Admin (`/admin.html`, khusus role `admin`)
-- Ringkasan: total produk aktif, total pengguna, total order, revenue (non-batal),
-  order terbaru, peringatan stok menipis
-- CRUD Produk: tambah/ubah/hapus (soft delete) + upload gambar
-- CRUD Kategori: tambah/ubah/hapus (produk yatim jadi tanpa kategori)
-- Kelola Pengguna: aktif/nonaktif akun, ubah role user/admin
-- Kelola Pesanan: filter per status, update
-  `pending > diproses > dikirim > selesai`, batalkan order (stok dikembalikan otomatis)
-- Laporan: revenue harian 14 hari (grafik canvas), revenue per kategori,
-  produk terlaris
+### Admin (`/admin.html`, `admin` role only)
+- Summary: total active products, total users, total orders, revenue (non-cancelled),
+  latest orders, low-stock warnings
+- Product CRUD: add/edit/delete (soft delete) + image upload
+- Category CRUD: add/edit/delete (orphaned products become uncategorised)
+- User management: activate/deactivate accounts, change user/admin role
+- Order management: filter by status, update
+  `pending > diproses > dikirim > selesai`, cancel an order (stock returned automatically)
+- Reports: daily revenue for 14 days (canvas chart), revenue per category,
+  best-selling products
 
-### Keamanan & Validasi
-- Semua endpoint sensitif divalidasi di server (`src/validate.js`)
-- Middleware `authRequired` (JWT) dan `adminRequired` (role) di setiap rute privat
-- User biasa yang membuka `/admin.html` atau `/api/admin/*` ditolak (403 + pesan khusus)
-- Akun nonaktif tidak bisa login; token lama ikut ditolak
-- Password di-hash bcrypt; password minimal 6 karakter
+### Security & Validation
+- All sensitive endpoints are validated on the server (`src/validate.js`)
+- `authRequired` (JWT) and `adminRequired` (role) middleware on every private route
+- Ordinary users opening `/admin.html` or `/api/admin/*` are rejected (403 + a specific message)
+- Inactive accounts cannot log in; old tokens are rejected too
+- Passwords are hashed with bcrypt; minimum password length is 6 characters
 
-## Struktur Proyek
+## Project Structure
 
 ```
 .
 ├── src/
-│   ├── server.js     # seluruh API + static hosting + upload
-│   ├── db.js         # skema SQLite (users, categories, products, orders, order_items, reviews)
-│   ├── auth.js       # hash/verify password, sign JWT, middleware auth + admin
-│   ├── validate.js   # validasi input server-side
-│   └── seed.js       # 6 kategori, 16 produk, 2 akun demo, 1 review
+│   ├── server.js     # all API + static hosting + upload
+│   ├── db.js         # SQLite schema (users, categories, products, orders, order_items, reviews)
+│   ├── auth.js       # hash/verify password, sign JWT, auth + admin middleware
+│   ├── validate.js   # server-side input validation
+│   └── seed.js       # 6 categories, 16 products, 2 demo accounts, 1 review
 ├── public/
 │   ├── index.html products.html product.html cart.html checkout.html
 │   ├── orders.html login.html register.html profile.html admin.html
-│   ├── css/style.css # design system (cream/navy/terracotta/sage, tanpa neon)
-│   └── js/app.js     # helper API, session JWT, keranjang localStorage, navbar/footer
-├── scripts/e2e.js    # tes HTTP end-to-end (18 skenario)
-└── uploads/          # hasil upload gambar produk (diabaikan git)
+│   ├── css/style.css # design system (cream/navy/terracotta/sage, no neon)
+│   └── js/app.js     # API helper, JWT session, localStorage cart, navbar/footer
+├── scripts/e2e.js    # HTTP end-to-end tests (18 scenarios)
+└── uploads/          # uploaded product images (ignored by git)
 ```
 
-## Cara Menjalankan
+## How to Run
 
-Butuh Node.js 22+ (disarankan 24).
+Requires Node.js 22+ (24 recommended).
 
 ```bash
 npm install
 npm start
 ```
 
-Buka http://localhost:3000 — admin di http://localhost:3000/admin.html
+Open http://localhost:3000 — admin at http://localhost:3000/admin.html
 
-| Akun  | Email | Password |
+| Account  | Email | Password |
 |-------|-------|----------|
 | Admin | admin@nusalapak.id | admin123 |
-| Pembeli demo | demo@nusalapak.id | demo1234 |
+| Demo buyer | demo@nusalapak.id | demo1234 |
 
-Variabel opsional:
+Optional variables:
 
 ```bash
-PORT=4000 npm start        # ganti port
+PORT=4000 npm start        # change port
 BASE=http://localhost:4000 npm run test:e2e
 ```
 
-Reset data demo: hentikan server, hapus `data.sqlite*`, jalankan `npm start` lagi
-(seed berjalan otomatis saat database kosong).
+Reset the demo data: stop the server, delete `data.sqlite*`, then run `npm start` again
+(seeding runs automatically when the database is empty).
 
-## Alur Demo (5 menit)
+## Demo Flow (5 minutes)
 
-1. Buka halaman utama, klik kategori atau cari "kopi".
-2. Buka detail produk, tambah ke keranjang, buka keranjang, lanjut checkout.
-   (Daftar akun baru dulu jika belum login.)
-3. Isi alamat, buat pesanan — catat kode order (mis. `NL-XXXX`).
-4. Login sebagai admin, buka Dashboard > Pesanan, geser status
+1. Open the home page, click a category or search for "kopi".
+2. Open a product detail page, add to cart, open the cart, proceed to checkout.
+   (Register a new account first if you are not logged in.)
+3. Fill in the address, create the order — note the order code (e.g. `NL-XXXX`).
+4. Log in as admin, open Dashboard > Orders, move the status
    Menunggu > Diproses > Dikirim > Selesai.
-5. Login lagi sebagai pembeli, buka Pesanan — status terbaru tampil di timeline.
-6. Kembali ke produk yang dibeli, tulis ulasan bintang 5.
+5. Log in again as the buyer, open Orders — the latest status appears in the timeline.
+6. Go back to the purchased product and write a 5-star review.
 
 ## Testing
 
 ```bash
-npm run test:e2e   # butuh server jalan; 18 skenario HTTP, terakhir verified: 18/18 lolos
+npm run test:e2e   # needs the server running; 18 HTTP scenarios, last verified: 18/18 passed
 ```
 
-Cakupan: register, login admin, list produk, guard tanpa token (401),
-guard user ke rute admin (403), checkout, pengurangan stok, transisi status order,
-visibilitas status di sisi user, tulis review, stats admin, reports,
-create/update/delete kategori dan produk.
+Coverage: register, admin login, product list, guard without token (401),
+user guard on admin routes (403), checkout, stock deduction, order status transitions,
+status visibility on the user side, writing a review, admin stats, reports,
+create/update/delete categories and products.
 
-## Desain
+## Design
 
-- Palet: cream `#FAF7F2`, navy `#1E3A5F`, terracotta `#C2703D`, sage `#5F7F60`
-- Heading serif (Georgia) untuk nuansa lokal yang elegan, body sans-system
-- Flat, tanpa neon, tanpa glow, tanpa gaya gamer/cyberpunk
-- Responsive: grid adaptif + breakpoint 820px (sidebar admin jadi chip, nav ringkas)
+- Palette: cream `#FAF7F2`, navy `#1E3A5F`, terracotta `#C2703D`, sage `#5F7F60`
+- Serif headings (Georgia) for an elegant local feel, system sans-serif body
+- Flat, no neon, no glow, no gamer/cyberpunk style
+- Responsive: adaptive grid + 820px breakpoint (admin sidebar becomes chips, compact nav)
 
-## Lisensi
+## License
 
-MIT — bebas dipakai sebagai portofolio maupun dikembangkan lebih lanjut.
+MIT — free to use as a portfolio piece or to develop further.
